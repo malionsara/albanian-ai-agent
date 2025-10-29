@@ -31,7 +31,7 @@ export class GeminiLiveAudioSession extends EventEmitter {
           setup: {
             model: `models/${model}`,
             generation_config: {
-              response_modalities: ['AUDIO'], // Native audio output
+              response_modalities: ['TEXT', 'AUDIO'], // Text + Audio output
               speech_config: {
                 voice_config: {
                   prebuilt_voice_config: {
