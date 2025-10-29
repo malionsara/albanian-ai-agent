@@ -1,0 +1,21 @@
+{
+  "name": "albanian-agent-backend",
+  "version": "1.0.0",
+  "description": "Backend server for Albanian AI Voice Agent",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.16.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "@google/generative-ai": "^0.21.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}

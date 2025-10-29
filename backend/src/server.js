@@ -1,0 +1,131 @@
+import express from 'express';
+import { WebSocketServer } from 'ws';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { GeminiLiveAudioSession } from './gemini-live-audio.js';
+
+dotenv.config();
+
+const app = express();
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+
+// Middleware
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*'
+}));
+app.use(express.json());
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// WebSocket connection handler
+wss.on('connection', (ws) => {
+  console.log('New client connected');
+
+  let geminiSession = null;
+
+  ws.on('message', async (message) => {
+    try {
+      const data = JSON.parse(message);
+
+      switch (data.type) {
+        case 'start':
+          // Initialize Gemini Live Audio session
+          geminiSession = new GeminiLiveAudioSession({
+            apiKey: process.env.GEMINI_API_KEY,
+            systemPrompt: data.config?.systemPrompt || 'You are a helpful Albanian AI assistant. Speak naturally and conversationally.',
+            language: data.config?.language || 'sq', // Albanian
+          });
+
+          await geminiSession.connect();
+
+          // Forward Gemini responses to client
+          geminiSession.on('ready', () => {
+            ws.send(JSON.stringify({ type: 'ready' }));
+          });
+
+          geminiSession.on('response', (response) => {
+            ws.send(JSON.stringify({
+              type: 'response',
+              data: response
+            }));
+          });
+
+          geminiSession.on('audio', (audioData) => {
+            ws.send(JSON.stringify({
+              type: 'audio',
+              data: audioData
+            }));
+          });
+
+          geminiSession.on('turnComplete', () => {
+            ws.send(JSON.stringify({
+              type: 'turnComplete'
+            }));
+          });
+
+          geminiSession.on('error', (error) => {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: error.message
+            }));
+          });
+
+          break;
+
+        case 'audio':
+          // Forward audio to Gemini
+          if (geminiSession) {
+            await geminiSession.sendAudio(data.audio);
+          }
+          break;
+
+        case 'text':
+          // Forward text message to Gemini
+          if (geminiSession) {
+            await geminiSession.sendText(data.text);
+          }
+          break;
+
+        case 'stop':
+          // Stop the session
+          if (geminiSession) {
+            await geminiSession.disconnect();
+            geminiSession = null;
+          }
+          break;
+
+        default:
+          console.log('Unknown message type:', data.type);
+      }
+    } catch (error) {
+      console.error('Error handling message:', error);
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: error.message
+      }));
+    }
+  });
+
+  ws.on('close', async () => {
+    console.log('Client disconnected');
+    if (geminiSession) {
+      await geminiSession.disconnect();
+      geminiSession = null;
+    }
+  });
+
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
+});
+
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`WebSocket server ready at ws://localhost:${PORT}`);
+});
