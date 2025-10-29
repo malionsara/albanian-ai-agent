@@ -4,16 +4,12 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   build: {
-    lib: {
-      entry: 'src/main.jsx',
-      name: 'AlbanianAgent',
-      fileName: (format) => `albanian-agent.${format}.js`,
-      formats: ['es', 'umd']
-    },
+    // Build as a regular app, not a library
+    outDir: 'dist',
+    // Ensure index.html is included
     rollupOptions: {
-      external: [],
-      output: {
-        globals: {}
+      input: {
+        main: './index.html'
       }
     }
   },
