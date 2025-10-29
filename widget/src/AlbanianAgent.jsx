@@ -7,6 +7,9 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [error, setError] = useState(null);
+  const [userSpeaking, setUserSpeaking] = useState(false);
+  const [aiSpeaking, setAiSpeaking] = useState(false);
+  const [conversationMode, setConversationMode] = useState(false); // Phone call mode
 
   const wsRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -65,6 +68,24 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
         case 'turnComplete':
           // Turn is complete, ready for next input
           console.log('Turn complete');
+          break;
+
+        case 'userSpeaking':
+          // VAD detected user speaking
+          setUserSpeaking(data.speaking);
+          console.log(data.speaking ? 'User started speaking' : 'User stopped speaking');
+          break;
+
+        case 'aiSpeaking':
+          // AI is speaking
+          setAiSpeaking(data.speaking);
+          console.log(data.speaking ? 'AI started speaking' : 'AI stopped speaking');
+          break;
+
+        case 'aiInterrupted':
+          // User interrupted the AI
+          console.log('AI was interrupted');
+          setAiSpeaking(false);
           break;
 
         case 'error':
@@ -301,6 +322,32 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
         <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
           {isConnected ? '● Connected' : '○ Disconnected'}
         </span>
+
+        {conversationMode && isConnected && (
+          <div className="conversation-status">
+            {userSpeaking && <span className="speaking-indicator user">🎤 You're speaking...</span>}
+            {aiSpeaking && <span className="speaking-indicator ai">🔊 AI is speaking...</span>}
+            {!userSpeaking && !aiSpeaking && <span className="speaking-indicator listening">👂 Listening...</span>}
+          </div>
+        )}
+
+        {isConnected && (
+          <button
+            className={`conversation-toggle ${conversationMode ? 'active' : ''}`}
+            onClick={() => {
+              if (!conversationMode) {
+                setConversationMode(true);
+                startRecording();
+              } else {
+                setConversationMode(false);
+                stopRecording();
+              }
+            }}
+            title={conversationMode ? 'End phone call mode' : 'Start phone call mode'}
+          >
+            {conversationMode ? '📞 End Call' : '📞 Start Call'}
+          </button>
+        )}
       </div>
 
       <div className="messages-container">

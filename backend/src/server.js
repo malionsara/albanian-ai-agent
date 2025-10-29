@@ -68,6 +68,29 @@ wss.on('connection', (ws) => {
             }));
           });
 
+          // Forward VAD events (user speaking detection)
+          geminiSession.on('userSpeaking', (data) => {
+            ws.send(JSON.stringify({
+              type: 'userSpeaking',
+              speaking: data.speaking
+            }));
+          });
+
+          // Forward AI speaking state
+          geminiSession.on('aiSpeaking', (data) => {
+            ws.send(JSON.stringify({
+              type: 'aiSpeaking',
+              speaking: data.speaking
+            }));
+          });
+
+          // Forward interruption events
+          geminiSession.on('aiInterrupted', () => {
+            ws.send(JSON.stringify({
+              type: 'aiInterrupted'
+            }));
+          });
+
           geminiSession.on('error', (error) => {
             ws.send(JSON.stringify({
               type: 'error',

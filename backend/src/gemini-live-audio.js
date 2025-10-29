@@ -38,6 +38,13 @@ export class GeminiLiveAudioSession extends EventEmitter {
                     voice_name: 'Kore' // Natural voice
                   }
                 }
+              },
+              // Enable automatic Voice Activity Detection
+              automatic_activity_detection: {
+                disabled: false,
+                speech_start_sensitivity: 0.5, // 0-1, lower = more sensitive
+                speech_end_timeout_ms: 1500, // Wait 1.5s of silence before ending turn
+                padding_ms: 200 // Add 200ms padding around speech
               }
             },
             system_instruction: {
@@ -85,12 +92,24 @@ export class GeminiLiveAudioSession extends EventEmitter {
       return;
     }
 
+    // Handle tool call (if any)
+    if (message.toolCall) {
+      console.log('Tool call:', message.toolCall);
+    }
+
+    // Handle tool call cancellation
+    if (message.toolCallCancellation) {
+      console.log('Tool call cancelled:', message.toolCallCancellation);
+    }
+
     // Handle server content (responses)
     if (message.serverContent) {
       const content = message.serverContent;
 
-      // Handle audio response
+      // Detect when AI starts speaking (for UI indicator)
       if (content.modelTurn) {
+        this.emit('aiSpeaking', { speaking: true });
+
         const parts = content.modelTurn.parts || [];
 
         for (const part of parts) {
@@ -117,8 +136,26 @@ export class GeminiLiveAudioSession extends EventEmitter {
 
       // Handle turn complete
       if (content.turnComplete) {
+        this.emit('aiSpeaking', { speaking: false });
         this.emit('turnComplete');
       }
+
+      // Handle interruption (user started speaking while AI was speaking)
+      if (content.interrupted) {
+        console.log('AI was interrupted by user');
+        this.emit('aiInterrupted');
+      }
+    }
+
+    // Handle activity detection (user speaking events from VAD)
+    if (message.activityStart) {
+      console.log('User started speaking (VAD detected)');
+      this.emit('userSpeaking', { speaking: true });
+    }
+
+    if (message.activityEnd) {
+      console.log('User stopped speaking (VAD detected)');
+      this.emit('userSpeaking', { speaking: false });
     }
   }
 
