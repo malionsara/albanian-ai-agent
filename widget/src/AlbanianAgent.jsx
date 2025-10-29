@@ -14,6 +14,9 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
   const audioContextRef = useRef(null);
   const audioWorkletRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const audioQueueRef = useRef([]);
+  const isPlayingRef = useRef(false);
+  const nextStartTimeRef = useRef(0);
 
   // WebSocket connection
   useEffect(() => {
@@ -100,7 +103,7 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
     }
   };
 
-  // Play audio response from Gemini (PCM audio)
+  // Play audio response from Gemini (PCM audio) with proper queuing
   const playAudioResponse = async (base64Data, mimeType) => {
     try {
       // Decode base64 to ArrayBuffer
@@ -133,15 +136,42 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
         channelData[i] = int16 / 32768.0; // Normalize to -1.0 to 1.0
       }
 
-      // Play the audio
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      source.start(0);
+      // Queue the audio chunk
+      playAudioChunk(audioContext, audioBuffer);
 
     } catch (error) {
       console.error('Error playing audio:', error);
     }
+  };
+
+  // Play audio chunks sequentially (not simultaneously)
+  const playAudioChunk = (audioContext, audioBuffer) => {
+    // Calculate when this chunk should start
+    const currentTime = audioContext.currentTime;
+
+    // If nothing is playing, start immediately
+    if (nextStartTimeRef.current < currentTime) {
+      nextStartTimeRef.current = currentTime;
+    }
+
+    // Create and schedule the audio source
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext.destination);
+
+    // Start at the calculated time (queued)
+    source.start(nextStartTimeRef.current);
+
+    // Update next start time to be after this chunk finishes
+    nextStartTimeRef.current += audioBuffer.duration;
+
+    // Reset timer when audio finishes to prevent drift
+    source.onended = () => {
+      const now = audioContext.currentTime;
+      if (nextStartTimeRef.current < now) {
+        nextStartTimeRef.current = now;
+      }
+    };
   };
 
   // Voice recording with real-time streaming
