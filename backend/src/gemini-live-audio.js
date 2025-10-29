@@ -53,6 +53,7 @@ export class GeminiLiveAudioSession extends EventEmitter {
           }
         };
 
+        console.log('📤 Sending setup message:', JSON.stringify(setupMessage, null, 2));
         this.ws.send(JSON.stringify(setupMessage));
         this.isConnected = true;
         this.emit('ready');
@@ -61,19 +62,26 @@ export class GeminiLiveAudioSession extends EventEmitter {
       this.ws.on('message', (data) => {
         try {
           const message = JSON.parse(data.toString());
+          console.log('📩 Gemini message:', JSON.stringify(message, null, 2));
           this.handleGeminiMessage(message);
         } catch (error) {
           console.error('Error parsing message:', error);
+          console.error('Raw data:', data.toString());
         }
       });
 
       this.ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
+        console.error('❌ WebSocket error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          stack: error.stack
+        });
         this.emit('error', error);
       });
 
-      this.ws.on('close', () => {
-        console.log('❌ Disconnected from Gemini Live API');
+      this.ws.on('close', (code, reason) => {
+        console.log(`❌ Disconnected from Gemini Live API - Code: ${code}, Reason: ${reason || 'No reason provided'}`);
         this.isConnected = false;
         this.emit('disconnected');
       });
