@@ -38,13 +38,6 @@ export class GeminiLiveAudioSession extends EventEmitter {
                     voice_name: 'Kore' // Natural voice
                   }
                 }
-              },
-              // Enable automatic Voice Activity Detection
-              automatic_activity_detection: {
-                disabled: false,
-                speech_start_sensitivity: 0.5, // 0-1, lower = more sensitive
-                speech_end_timeout_ms: 1500, // Wait 1.5s of silence before ending turn
-                padding_ms: 200 // Add 200ms padding around speech
               }
             },
             system_instruction: {
