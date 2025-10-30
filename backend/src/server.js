@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { GeminiLiveAudioSession } from './gemini-live-audio.js';
+import { GoogleGenAI } from '@google/generative-ai';
 
 dotenv.config();
 
@@ -25,32 +26,25 @@ app.get('/health', (req, res) => {
 // Generate ephemeral token for Gemini Live API
 app.post('/api/token', async (req, res) => {
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1alpha/auth:generateToken?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uses: 1,
-          expireTime: Math.floor(Date.now() / 1000) + 1800, // 30 minutes
-          newSessionExpireTime: Math.floor(Date.now() / 1000) + 60, // 1 minute
-        }),
+    const client = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: { apiVersion: 'v1alpha' }
+    });
+
+    const now = new Date();
+    const token = await client.authTokens.create({
+      config: {
+        uses: 1,  // Single-use token
+        expireTime: new Date(now.getTime() + 30 * 60 * 1000),  // 30 minutes
+        newSessionExpireTime: new Date(now.getTime() + 1 * 60 * 1000),  // 1 minute
       }
-    );
+    });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Token generation error:', error);
-      return res.status(response.status).json({ error: 'Failed to generate token' });
-    }
-
-    const data = await response.json();
-    res.json({ token: data.token });
+    console.log('✅ Generated ephemeral token');
+    res.json({ token: token.name });
   } catch (error) {
-    console.error('Error generating token:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Error generating token:', error.message);
+    res.status(500).json({ error: 'Failed to generate token' });
   }
 });
 
