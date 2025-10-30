@@ -22,6 +22,38 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Generate ephemeral token for Gemini Live API
+app.post('/api/token', async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1alpha/auth:generateToken?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uses: 1,
+          expireTime: Math.floor(Date.now() / 1000) + 1800, // 30 minutes
+          newSessionExpireTime: Math.floor(Date.now() / 1000) + 60, // 1 minute
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Token generation error:', error);
+      return res.status(response.status).json({ error: 'Failed to generate token' });
+    }
+
+    const data = await response.json();
+    res.json({ token: data.token });
+  } catch (error) {
+    console.error('Error generating token:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // WebSocket connection handler
 wss.on('connection', (ws) => {
   console.log('New client connected');
@@ -37,6 +69,7 @@ wss.on('connection', (ws) => {
           // Initialize Gemini Live Audio session
           geminiSession = new GeminiLiveAudioSession({
             apiKey: process.env.GEMINI_API_KEY,
+            token: data.config?.token, // Ephemeral token from client
             systemPrompt: data.config?.systemPrompt || 'You are a helpful Albanian AI assistant. Speak naturally and conversationally.',
             language: data.config?.language || 'sq', // Albanian
           });

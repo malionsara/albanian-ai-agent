@@ -23,20 +23,47 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
 
   // WebSocket connection
   useEffect(() => {
-    const ws = new WebSocket(serverUrl);
-    wsRef.current = ws;
+    const connectToServer = async () => {
+      try {
+        // First, get an ephemeral token (fallback to direct connection if token endpoint fails)
+        let token = null;
+        try {
+          const backendUrl = serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+          const tokenResponse = await fetch(`${backendUrl}/api/token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
 
-    ws.onopen = () => {
-      console.log('Connected to server');
-      setIsConnected(true);
-      setError(null);
+          if (tokenResponse.ok) {
+            const tokenData = await tokenResponse.json();
+            token = tokenData.token;
+            console.log('✅ Got ephemeral token');
+          } else {
+            console.warn('⚠️ Failed to get ephemeral token, trying direct connection');
+          }
+        } catch (error) {
+          console.warn('⚠️ Token fetch error:', error);
+        }
 
-      // Start session
-      ws.send(JSON.stringify({
-        type: 'start',
-        config: config
-      }));
-    };
+        const ws = new WebSocket(serverUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('Connected to server');
+          setIsConnected(true);
+          setError(null);
+
+          // Start session with token if available
+          ws.send(JSON.stringify({
+            type: 'start',
+            config: {
+              ...config,
+              token: token
+            }
+          }));
+        };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -105,12 +132,19 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
       setIsConnected(false);
     };
 
-    return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'stop' }));
-        ws.close();
+        return () => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'stop' }));
+            ws.close();
+          }
+        };
+      } catch (error) {
+        console.error('Connection error:', error);
+        setError('Failed to connect to server');
       }
     };
+
+    connectToServer();
   }, [serverUrl, config]);
 
   // Text-to-Speech using Web Speech API (fallback)

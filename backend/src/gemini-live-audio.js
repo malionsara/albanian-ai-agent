@@ -6,9 +6,10 @@ import WebSocket from 'ws';
  * Uses WebSocket connection for real-time bidirectional audio
  */
 export class GeminiLiveAudioSession extends EventEmitter {
-  constructor({ apiKey, systemPrompt, language = 'sq' }) {
+  constructor({ apiKey, token, systemPrompt, language = 'sq' }) {
     super();
     this.apiKey = apiKey;
+    this.token = token;
     this.systemPrompt = systemPrompt;
     this.language = language;
     this.ws = null;
@@ -19,7 +20,10 @@ export class GeminiLiveAudioSession extends EventEmitter {
     try {
       // Gemini Live API WebSocket endpoint
       const model = 'gemini-2.0-flash-exp';
-      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
+
+      // Use token if provided (ephemeral token), otherwise use API key
+      const authParam = this.token ? `access_token=${this.token}` : `key=${this.apiKey}`;
+      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?${authParam}`;
 
       this.ws = new WebSocket(url);
 
