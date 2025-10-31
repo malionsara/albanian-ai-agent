@@ -1,86 +1,65 @@
 import { EventEmitter } from 'events';
-import WebSocket from 'ws';
+import { GoogleGenAI } from '@google/genai';
 
 /**
- * Gemini Live API with native audio streaming
- * Uses WebSocket connection for real-time bidirectional audio
+ * Gemini Live API with native audio streaming using official SDK
  */
 export class GeminiLiveAudioSession extends EventEmitter {
-  constructor({ apiKey, token, systemPrompt, language = 'sq' }) {
+  constructor({ apiKey, systemPrompt, language = 'sq' }) {
     super();
     this.apiKey = apiKey;
-    this.token = token;
     this.systemPrompt = systemPrompt;
     this.language = language;
-    this.ws = null;
+    this.session = null;
     this.isConnected = false;
   }
 
   async connect() {
     try {
-      // Gemini Live API WebSocket endpoint
-      const model = 'gemini-2.0-flash-live-001';
+      // Initialize Google Gen AI client
+      const ai = new GoogleGenAI({ apiKey: this.apiKey });
 
-      // Use v1alpha with API key (as per official examples)
-      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
+      console.log('🔗 Connecting to Gemini Live API using SDK...');
 
-      console.log(`🔗 Connecting to Gemini Live API (v1alpha with API key)...`);
-      this.ws = new WebSocket(url);
-
-      this.ws.on('open', () => {
-        console.log('✅ Connected to Gemini Live API (Native Audio)');
-
-        // Send initial setup message
-        const setupMessage = {
-          setup: {
-            model: model,
-            generation_config: {
-              response_modalities: ['TEXT', 'AUDIO'], // Text + Audio output
-              speech_config: {
-                voice_config: {
-                  prebuilt_voice_config: {
-                    voice_name: 'Kore' // Natural voice
-                  }
-                }
+      // Connect to Live API with configuration
+      this.session = await ai.live.connect({
+        model: 'gemini-2.0-flash-live-001',
+        config: {
+          responseModalities: ['TEXT', 'AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: 'Kore'
               }
-            },
-            system_instruction: {
-              parts: [{ text: this.systemPrompt }]
             }
+          },
+          systemInstruction: {
+            parts: [{ text: this.systemPrompt }]
           }
-        };
+        },
+        callbacks: {
+          onopen: () => {
+            console.log('✅ Connected to Gemini Live API');
+            this.isConnected = true;
+            this.emit('ready');
+          },
 
-        console.log('📤 Sending setup message:', JSON.stringify(setupMessage, null, 2));
-        this.ws.send(JSON.stringify(setupMessage));
-        this.isConnected = true;
-        this.emit('ready');
-      });
+          onmessage: (message) => {
+            console.log('📩 Gemini message:', JSON.stringify(message, null, 2));
+            this.handleGeminiMessage(message);
+          },
 
-      this.ws.on('message', (data) => {
-        try {
-          const message = JSON.parse(data.toString());
-          console.log('📩 Gemini message:', JSON.stringify(message, null, 2));
-          this.handleGeminiMessage(message);
-        } catch (error) {
-          console.error('Error parsing message:', error);
-          console.error('Raw data:', data.toString());
+          onerror: (error) => {
+            console.error('❌ Live API error:', error);
+            this.emit('error', error);
+          },
+
+          onclose: (event) => {
+            console.log(`❌ Disconnected from Gemini Live API - Code: ${event.code}, Reason: ${event.reason || 'No reason provided'}`);
+            this.isConnected = false;
+            this.emit('disconnected');
+          }
         }
-      });
-
-      this.ws.on('error', (error) => {
-        console.error('❌ WebSocket error:', error);
-        console.error('Error details:', {
-          message: error.message,
-          code: error.code,
-          stack: error.stack
-        });
-        this.emit('error', error);
-      });
-
-      this.ws.on('close', (code, reason) => {
-        console.log(`❌ Disconnected from Gemini Live API - Code: ${code}, Reason: ${reason || 'No reason provided'}`);
-        this.isConnected = false;
-        this.emit('disconnected');
       });
 
     } catch (error) {
@@ -169,7 +148,7 @@ export class GeminiLiveAudioSession extends EventEmitter {
    * @param {Buffer|string} audioData - PCM audio data (16-bit, 16kHz) as Buffer or base64 string
    */
   sendAudio(audioData) {
-    if (!this.isConnected || !this.ws) {
+    if (!this.isConnected || !this.session) {
       throw new Error('Session not connected');
     }
 
@@ -178,29 +157,23 @@ export class GeminiLiveAudioSession extends EventEmitter {
       ? audioData.toString('base64')
       : audioData;
 
-    const message = {
-      realtimeInput: {
-        mediaChunks: [
-          {
-            mimeType: 'audio/pcm;rate=16000',
-            data: base64Audio
-          }
-        ]
+    this.session.sendRealtimeInput({
+      audio: {
+        data: base64Audio,
+        mimeType: 'audio/pcm;rate=16000'
       }
-    };
-
-    this.ws.send(JSON.stringify(message));
+    });
   }
 
   /**
    * Send text message to Gemini
    */
   sendText(text) {
-    if (!this.isConnected || !this.ws) {
+    if (!this.isConnected || !this.session) {
       throw new Error('Session not connected');
     }
 
-    const message = {
+    this.session.sendClientMessage({
       clientContent: {
         turns: [
           {
@@ -210,15 +183,13 @@ export class GeminiLiveAudioSession extends EventEmitter {
         ],
         turnComplete: true
       }
-    };
-
-    this.ws.send(JSON.stringify(message));
+    });
   }
 
   async disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    if (this.session) {
+      this.session.close();
+      this.session = null;
     }
     this.isConnected = false;
   }
