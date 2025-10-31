@@ -19,7 +19,7 @@ export class GeminiLiveAudioSession extends EventEmitter {
   async connect() {
     try {
       // Gemini Live API WebSocket endpoint
-      const model = 'gemini-2.0-flash-exp';
+      const model = 'gemini-2.0-flash-live-001';
 
       // Use v1alpha with API key (as per official examples)
       const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
@@ -33,7 +33,7 @@ export class GeminiLiveAudioSession extends EventEmitter {
         // Send initial setup message
         const setupMessage = {
           setup: {
-            model: `models/${model}`,
+            model: model,
             generation_config: {
               response_modalities: ['TEXT', 'AUDIO'], // Text + Audio output
               speech_config: {
