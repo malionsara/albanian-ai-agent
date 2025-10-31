@@ -23,47 +23,20 @@ export function AlbanianAgent({ serverUrl, config = {} }) {
 
   // WebSocket connection
   useEffect(() => {
-    const connectToServer = async () => {
-      try {
-        // First, get an ephemeral token (fallback to direct connection if token endpoint fails)
-        let token = null;
-        try {
-          const backendUrl = serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
-          const tokenResponse = await fetch(`${backendUrl}/api/token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
+    const ws = new WebSocket(serverUrl);
+    wsRef.current = ws;
 
-          if (tokenResponse.ok) {
-            const tokenData = await tokenResponse.json();
-            token = tokenData.token;
-            console.log('✅ Got ephemeral token');
-          } else {
-            console.warn('⚠️ Failed to get ephemeral token, trying direct connection');
-          }
-        } catch (error) {
-          console.warn('⚠️ Token fetch error:', error);
-        }
+    ws.onopen = () => {
+      console.log('Connected to server');
+      setIsConnected(true);
+      setError(null);
 
-        const ws = new WebSocket(serverUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          console.log('Connected to server');
-          setIsConnected(true);
-          setError(null);
-
-          // Start session with token if available
-          ws.send(JSON.stringify({
-            type: 'start',
-            config: {
-              ...config,
-              token: token
-            }
-          }));
-        };
+      // Start session
+      ws.send(JSON.stringify({
+        type: 'start',
+        config: config
+      }));
+    };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);

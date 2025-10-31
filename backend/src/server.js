@@ -4,7 +4,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { GeminiLiveAudioSession } from './gemini-live-audio.js';
-import { GoogleGenAI } from '@google/generative-ai';
 
 dotenv.config();
 
@@ -21,31 +20,6 @@ app.use(express.json());
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Generate ephemeral token for Gemini Live API
-app.post('/api/token', async (req, res) => {
-  try {
-    const client = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: { apiVersion: 'v1alpha' }
-    });
-
-    const now = new Date();
-    const token = await client.authTokens.create({
-      config: {
-        uses: 1,  // Single-use token
-        expireTime: new Date(now.getTime() + 30 * 60 * 1000),  // 30 minutes
-        newSessionExpireTime: new Date(now.getTime() + 1 * 60 * 1000),  // 1 minute
-      }
-    });
-
-    console.log('✅ Generated ephemeral token');
-    res.json({ token: token.name });
-  } catch (error) {
-    console.error('❌ Error generating token:', error.message);
-    res.status(500).json({ error: 'Failed to generate token' });
-  }
 });
 
 // WebSocket connection handler
