@@ -21,12 +21,10 @@ export class GeminiLiveAudioSession extends EventEmitter {
       // Gemini Live API WebSocket endpoint
       const model = 'gemini-2.0-flash-exp';
 
-      // Try v1beta first (supports API keys), fallback to v1alpha with token
-      const apiVersion = this.token ? 'v1alpha' : 'v1beta';
-      const authParam = this.token ? `access_token=${this.token}` : `key=${this.apiKey}`;
-      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.${apiVersion}.GenerativeService.BidiGenerateContent?${authParam}`;
+      // Use v1alpha with API key (as per official examples)
+      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
 
-      console.log(`🔗 Connecting to Gemini Live API (${apiVersion})...`);
+      console.log(`🔗 Connecting to Gemini Live API (v1alpha with API key)...`);
       this.ws = new WebSocket(url);
 
       this.ws.on('open', () => {
